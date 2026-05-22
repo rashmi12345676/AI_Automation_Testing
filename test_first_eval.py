@@ -1,10 +1,7 @@
-import os
-import json
 import pandas as pd
 from dotenv import load_dotenv
-# from  groqwrapper import  GroqModel 
-from deepeval.evaluate import evaluate
 from deepeval.test_case import LLMTestCase
+from groqconnection  import GroqModel
 from deepeval.metrics import (
     AnswerRelevancyMetric,
     ContextualPrecisionMetric,
@@ -12,42 +9,6 @@ from deepeval.metrics import (
     FaithfulnessMetric,
     HallucinationMetric,
 )
-from groq import Groq
-from deepeval.models.base_model import DeepEvalBaseLLM
-
-# Improved Groq wrapper to handle JSON requirements
-class GroqModel(DeepEvalBaseLLM):
-    def __init__(self, model_name="llama3-70b-8192"):
-        self.client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
-        self.model_name = model_name
-
-    def load_model(self):
-        return self.client
-
-    def generate(self, prompt: str) -> str:
-        use_json = "llama" in self.model_name.lower()
-        chat_completion = self.client.chat.completions.create(
-            messages= [
-            {
-                "role": "system", 
-                "content": "You are a helpful assistant. Respond strictly in JSON format."
-            },
-            {
-                "role": "user", 
-                "content": prompt
-            }
-        ],
-            model=self.model_name,
-            # Force JSON mode if using a compatible model
-            response_format={"type": "json_object"} if use_json else None
-        )
-        return chat_completion.choices[0].message.content
-
-    async def a_generate(self, prompt: str) -> str:
-        return self.generate(prompt)
-
-    def get_model_name(self):
-        return self.model_name
 
 # Rest of your script...
 def test_first_eval():
@@ -56,7 +17,6 @@ def test_first_eval():
 
     
     # Initialize metrics with the model
-    # Note: Use async_mode=False for simple loops to avoid event loop issues
     arm = AnswerRelevancyMetric(threshold=0.7, model=eval_model, async_mode=False)
     cr = ContextualRelevancyMetric(threshold=0.7, model=eval_model, async_mode=False)
     cp = ContextualPrecisionMetric(threshold=0.7, model=eval_model, async_mode=False)
@@ -68,8 +28,7 @@ def test_first_eval():
     df['contextual_relevancy_score'] = 0.0
 
     for index, row in df.iterrows():
-        # Clean contexts: Ensure they are lists of strings
-        # DeepEval often expects multiple chunks in retrieval_context
+       
         retrieval_context = [str(row['retrieval_context'])] if pd.notna(row['retrieval_context']) else []
         ground_truth_context = [str(row['context'])] if pd.notna(row['context']) else []
         user_input = str(row['input'])
@@ -118,9 +77,9 @@ def test_first_eval():
 def test_ans_relvancy():
     load_dotenv()
     
-    # 1. Setup Model
+   
     eval_model = GroqModel(model_name="llama-3.3-70b-versatile")
-    
+    print(eval_model)
     # 2. Setup Metric
     arm1 = AnswerRelevancyMetric(threshold=0.7, model=eval_model, async_mode=False)
     faith_metric = FaithfulnessMetric(threshold=0.7, model=eval_model)
@@ -156,7 +115,7 @@ def test_ans_relvancy():
     assert arm1.is_successful(), f"Score {arm1.score} is below threshold!"
     assert faith_metric.is_successful(), f"Score {faith_metric.score} is below threshold!"
 
-    evaluate(test_case,metrics=arm1)
+    # evaluate(test_case,metrics=arm1)
 
 
 
